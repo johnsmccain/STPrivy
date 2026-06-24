@@ -17,8 +17,17 @@ export default () => ({
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
 
-  blockchain: {
-    rpcUrl: process.env.RPC_URL,
-    contractAddress: process.env.CONTRACT_ADDRESS,
+  stellar: {
+    network: process.env.STELLAR_NETWORK ?? 'testnet',
+    horizonUrl: process.env.HORIZON_URL,
+    sorobanRpcUrl: process.env.SOROBAN_RPC_URL,
+    serverSecret: process.env.STELLAR_SERVER_SECRET,
+    homeDomain: process.env.HOME_DOMAIN ?? 'localhost',
+  },
+
+  soroban: {
+    issuerRegistryContractId: process.env.ISSUER_REGISTRY_CONTRACT_ID,
+    credentialRegistryContractId: process.env.CREDENTIAL_REGISTRY_CONTRACT_ID,
+    revocationRegistryContractId: process.env.REVOCATION_REGISTRY_CONTRACT_ID,
   },
 });

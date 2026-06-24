@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import configuration from './config/configuration';
 import { envValidationSchema } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { StellarModule } from './modules/stellar/stellar.module';
 import { SorobanModule } from './modules/soroban/soroban.module';
@@ -54,6 +55,9 @@ import { DIDModule } from './modules/did/did.module';
 
     // Infrastructure
     PrismaModule,
+
+    // Auth: SEP-10 + JWT
+    AuthModule,
     RedisModule,
     StellarModule,
     SorobanModule,
