@@ -16,6 +16,11 @@ export function useProofs() {
   return useQuery<ZKProof[]>({
     queryKey: ['proofs'],
     queryFn: () => safeGet('/proofs', []),
+    refetchInterval: (query) => {
+      // Auto-refresh if there are pending/generating proofs
+      const hasPending = query.state.data?.some((p) => ['PENDING', 'GENERATING'].includes(p.status));
+      return hasPending ? 2000 : false; // Poll every 2s if pending, otherwise stop
+    },
   });
 }
 
@@ -25,6 +30,22 @@ export function useGenerateProof() {
     mutationFn: (body: { credentialId: string; circuitId: CircuitId }) =>
       api.post<ZKProof>('/proofs/generate', body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['proofs'] }),
+  });
+}
+
+export function useProof(proofId: string | null) {
+  return useQuery<ZKProof>({
+    queryKey: ['proof', proofId],
+    queryFn: () => api.get<ZKProof>(`/proofs/${proofId}`),
+    enabled: !!proofId,
+    refetchInterval: (query) => {
+      // Poll every 2s while proof is pending or generating
+      const data = query.state.data;
+      if (data && ['PENDING', 'GENERATING'].includes(data.status)) {
+        return 2000;
+      }
+      return false;
+    },
   });
 }
 

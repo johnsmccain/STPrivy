@@ -5,6 +5,8 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SorobanService } from '../soroban/soroban.service';
@@ -20,6 +22,7 @@ export class ProofService {
     private readonly prisma: PrismaService,
     private readonly soroban: SorobanService,
     private readonly events: EventEmitter2,
+    @InjectQueue('proof-generation') private readonly proofQueue: Queue,
   ) {}
 
   /** List all proofs belonging to the requesting subject DID */
@@ -40,8 +43,7 @@ export class ProofService {
 
   /**
    * Enqueue a ZK proof generation job.
-   * In this phase proof generation runs synchronously (no worker queue yet).
-   * A real implementation would push to BullMQ here.
+   * The job is processed asynchronously by the BullMQ worker.
    */
   async generateProof(
     subjectDID: string,
@@ -68,9 +70,16 @@ export class ProofService {
       },
     });
 
-    // Simulate proof generation synchronously (placeholder until ZK worker is wired)
-    // In production this would be: await this.queue.add('generate-proof', { proofId: proof.id })
-    setImmediate(() => this.runProofGeneration(proof.id, credential.claims, circuitId));
+    // Enqueue the proof generation job to BullMQ
+    await this.proofQueue.add('generate-proof', {
+      proofId: proof.id,
+      subjectDID,
+      credentialId,
+      circuitId,
+      claims: credential.claims as Record<string, unknown>,
+    });
+
+    this.logger.log(`Proof generation job enqueued: ${proof.id} for circuit ${circuitId}`);
 
     return proof;
   }
@@ -129,40 +138,4 @@ export class ProofService {
     return verification;
   }
 
-  /** Simulated proof generation — sets status to COMPLETED with a mock artifact */
-  private async runProofGeneration(
-    proofId: string,
-    claims: unknown,
-    circuitId: string,
-  ) {
-    try {
-      await this.prisma.zKProof.update({
-        where: { id: proofId },
-        data: { status: ProofStatus.GENERATING },
-      });
-
-      // Placeholder: real implementation calls bb.js / Noir prover here
-      const mockArtifact = {
-        proof: Buffer.from(`mock-proof-${proofId}`).toString('hex'),
-        publicInputs: Buffer.from(JSON.stringify({ circuitId, claims })).toString('hex'),
-      };
-
-      await this.prisma.zKProof.update({
-        where: { id: proofId },
-        data: {
-          status: ProofStatus.COMPLETED,
-          artifact: mockArtifact as unknown as Prisma.InputJsonValue,
-          generatedAt: new Date(),
-        },
-      });
-
-      this.logger.log(`Proof ${proofId} generated (circuit: ${circuitId})`);
-    } catch (err) {
-      this.logger.error(`Proof generation failed for ${proofId}: ${(err as Error).message}`);
-      await this.prisma.zKProof.update({
-        where: { id: proofId },
-        data: { status: ProofStatus.FAILED },
-      });
-    }
-  }
 }
